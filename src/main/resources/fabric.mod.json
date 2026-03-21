@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "sahu",
+  "version": "${version}",
+  "name": "sahu",
+  "description": "tung sahu",
+  "authors": [],
+  "contact": {},
+  "license": "GPL-3.0",
+  "icon": "assets/sahu/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-datagen": [
+      "org.voximir.sahu.client.SahuDataGenerator"
+    ],
+    "client": [
+      "org.voximir.sahu.client.SahuClient"
+    ],
+    "main": [
+      "org.voximir.sahu.Sahu"
+    ]
+  },
+  "mixins": [
+    "sahu.mixins.json",
+    {
+      "config": "sahu.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}

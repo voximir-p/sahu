@@ -1,5 +1,5 @@
 {
     "code-runner.executorMap": {
-        "java": "cd $workspaceRoot && echo Running from $fileNameWithoutExt && prime-run ./gradlew runClient",
+        "java": "echo Running from $fileNameWithoutExt && prime-run $workspaceRoot/gradlew runClient",
     }
 }

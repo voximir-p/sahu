@@ -12,7 +12,6 @@ import net.minecraft.text.Text;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
 import net.minecraft.world.event.GameEvent;
 import org.voximir.sahu.ModSoundEvents;
 
@@ -59,13 +58,8 @@ public class TaurusPT247Item extends GunItem {
         Vec3d direction = player.getRotationVec(1.0f);
         Vec3d end = start.add(direction.multiply(RANGE));
 
-        // 1. Block raycast
-        BlockHitResult blockHit = world.raycast(new RaycastContext(
-                start, end,
-                RaycastContext.ShapeType.OUTLINE,
-                RaycastContext.FluidHandling.NONE,
-                player
-        ));
+        // 1. Block raycast (passes through non-solid blocks)
+        BlockHitResult blockHit = raycastFiltered(world, start, end, direction, player);
 
         // 2. Entity raycast (manual)
         Box searchBox = player.getBoundingBox()

@@ -1,14 +1,22 @@
 package org.voximir.sahu.items;
 
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.Entity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import net.minecraft.world.event.GameEvent;
 import org.voximir.sahu.FiringManager;
@@ -170,6 +178,38 @@ public abstract class GunItem extends Item {
             setAmmo(stack, getMaxAmmo());
             setReloading(stack, false);
         }
+    }
+
+    // ── Bullet raycast (skips transparent / non-solid blocks) ────────────
+
+    protected static BlockHitResult raycastFiltered(ServerWorld world, Vec3d start, Vec3d end, Vec3d direction, Entity shooter) {
+        BlockHitResult result = world.raycast(new RaycastContext(
+                start, end,
+                RaycastContext.ShapeType.OUTLINE,
+                RaycastContext.FluidHandling.NONE,
+                shooter
+        ));
+
+        int iterations = 200;
+        while (iterations-- > 0 && result.getType() != HitResult.Type.MISS) {
+            BlockPos hitBlock = result.getBlockPos();
+            BlockState state = world.getBlockState(hitBlock);
+
+            if (state.isSolidBlock(world, hitBlock)) {
+                return result;
+            }
+
+            // Advance just past the hit and re-raycast
+            Vec3d past = result.getPos().add(direction.multiply(0.01));
+            result = world.raycast(new RaycastContext(
+                    past, end,
+                    RaycastContext.ShapeType.OUTLINE,
+                    RaycastContext.FluidHandling.NONE,
+                    shooter
+            ));
+        }
+
+        return result;
     }
 
     // ── Abstract contract ────────────────────────────────────────────────

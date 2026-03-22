@@ -1,5 +1,9 @@
 package org.voximir.sahu.client;
 
+import org.voximir.sahu.ModDataComponents;
+import static org.voximir.sahu.Sahu.MOD_ID;
+import org.voximir.sahu.items.GunItem;
+
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.MinecraftClient;
@@ -8,10 +12,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Identifier;
-import org.voximir.sahu.ModDataComponents;
-import org.voximir.sahu.items.GunItem;
-
-import static org.voximir.sahu.Sahu.MOD_ID;
 
 /**
  * Renders ammo counter, fire mode, and reload state in the bottom-right corner
@@ -41,7 +41,7 @@ public class AmmoHudOverlay implements HudElement {
             int textWidth = textRenderer.getWidth(text);
             int x = screenWidth - textWidth - 9;
             int y = screenHeight - 16;
-            context.drawTextWithShadow(textRenderer, text, x, y, 0x070707);
+            context.drawTextWithShadow(textRenderer, text, x, y, 0xFF070707);
         } else {
             int ammo = stack.getOrDefault(ModDataComponents.AMMO, gun.getMaxAmmo());
             int maxAmmo = gun.getMaxAmmo();

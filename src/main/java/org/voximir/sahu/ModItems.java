@@ -1,22 +1,40 @@
 package org.voximir.sahu;
 
+import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemGroup;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
+import org.voximir.sahu.items.TaurusPT247;
 
 import java.util.function.Function;
 
 public class ModItems {
 
-    public static Item TAURUS_PT_24_7 = register("taurus_pt_24_7", Item::new, new Item.Settings());
+    public static final Item TAURUS_PT_24_7 = register("taurus_pt_24_7", TaurusPT247::new, new Item.Settings());
 
-    public static void initialize() {
-
+    private static RegistryKey<Item> keyOf(String id) {
+        return RegistryKey.of(RegistryKeys.ITEM, Identifier.of(Sahu.MOD_ID, id));
     }
 
-    public static <T extends Item> T register(String name, Function<Item.Settings, T> itemFactory, Item.Settings settings) {
-        Identifier itemId = Identifier.of(Sahu.MOD_ID, name);
-        return Registry.register(Registries.ITEM, itemId, itemFactory.apply(settings));
+    private static void addToCreativeTabs(Item item, RegistryKey<ItemGroup> tab) {
+        ItemGroupEvents.modifyEntriesEvent(tab)
+                .register((itemGroup) -> itemGroup.add(item));
+    }
+
+    public static void initialize() {
+        addToCreativeTabs(TAURUS_PT_24_7, ModItemGroups.SAHU_CREATIVE_TAB_KEY);
+
+        Sahu.LOGGER.info("ModItems initialized");
+    }
+
+    public static <T extends Item> T register(String id, Function<Item.Settings, T> itemFactory, Item.Settings settings) {
+        RegistryKey<Item> key = keyOf(id);
+        T item = itemFactory.apply(settings.registryKey(key));
+
+        return Registry.register(Registries.ITEM, key, item);
     }
 }

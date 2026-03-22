@@ -103,7 +103,7 @@ public class TaurusPT247Item extends GunItem {
                 // Headshot detection — top 25 % of bounding box
                 Box box = living.getBoundingBox();
                 double headThreshold = box.minY + box.getLengthY() * 0.75;
-                if (closestEntityHitPos.y >= headThreshold) {
+                if (closestEntityHitPos != null && closestEntityHitPos.y >= headThreshold) {
                     damage *= HEADSHOT_MULTIPLIER;
                     player.sendMessage(Text.literal("§c✦ Headshot!"), true);
 
@@ -121,11 +121,13 @@ public class TaurusPT247Item extends GunItem {
         }
 
         // Impact particles
-        world.spawnParticles(
-                ParticleTypes.CRIT,
-                hitPos.x, hitPos.y, hitPos.z,
-                5, 0.1, 0.1, 0.1, 0.01
-        );
+        if (hitPos != null) {
+            world.spawnParticles(
+                    ParticleTypes.CRIT,
+                    hitPos.x, hitPos.y, hitPos.z,
+                    5, 0.1, 0.1, 0.1, 0.01
+            );
+        }
 
         // Muzzle smoke
         world.spawnParticles(

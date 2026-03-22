@@ -2,12 +2,17 @@ package org.voximir.sahu.items;
 
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.StainedGlassPaneBlock;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.fluid.FluidState;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.tag.BlockTags;
+import net.minecraft.registry.tag.FluidTags;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -121,8 +126,11 @@ public class GunItem extends Item {
         fire(player);
         setAmmo(stack, ammo - 1);
 
+        float yawKick = player.getRandom().nextBoolean()
+                ? properties.recoilYaw()
+                : -properties.recoilYaw();
         ServerPlayNetworking.send(player, new RecoilS2CPayload(
-                properties.recoilPitch(), properties.recoilYaw(), properties.recoilDuration()
+                properties.recoilPitch(), yawKick, properties.recoilDuration()
         ));
 
         if (getFireMode(stack) == FireMode.SINGLE) {
@@ -167,42 +175,65 @@ public class GunItem extends Item {
             }
         }
 
-        // Choose closest hit (entity vs block)
+        // Choose the closest hit (entity vs block)
         Vec3d hitPos = blockHit.getPos();
         double blockDistSq = start.squaredDistanceTo(blockHit.getPos());
+        boolean entityIsCloser = closestEntity != null && closestEntityDistSq < blockDistSq;
 
-        if (closestEntity != null && closestEntityDistSq < blockDistSq) {
+        if (entityIsCloser) {
             hitPos = closestEntityHitPos;
+        }
 
-            if (closestEntity instanceof LivingEntity living) {
-                float damage = properties.baseDamage();
+        // Fluid interactions (water splashes + lava stopping)
+        Vec3d lavaHit = handleFluidInteractions(world, start, hitPos, direction);
+        boolean hitLava = false;
 
-                // Headshot detection — top 25% of bounding box
-                Box box = living.getBoundingBox();
-                double headThreshold = box.minY + box.getLengthY() * 0.75;
-                if (closestEntityHitPos != null && closestEntityHitPos.y >= headThreshold) {
-                    damage *= properties.headshotMultiplier();
-                    player.sendMessage(Text.literal("\u00A7c\u2726 Headshot!"), true);
+        if (lavaHit != null && start.squaredDistanceTo(lavaHit) < start.squaredDistanceTo(hitPos)) {
+            hitPos = lavaHit;
+            hitLava = true;
+            entityIsCloser = false;
+        }
 
-                    world.playSoundFromEntity(
-                            null, player,
-                            SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
-                            SoundCategory.PLAYERS,
-                            0.8f, 2.0f
-                    );
-                }
+        // Entity damage (skipped if lava blocked the path)
+        if (entityIsCloser && closestEntity instanceof LivingEntity living) {
+            float damage = properties.baseDamage();
 
-                living.damage(world, player.getDamageSources().playerAttack(player), damage);
+            // Headshot detection — top 25% of bounding box
+            Box box = living.getBoundingBox();
+            double headThreshold = box.minY + box.getLengthY() * 0.75;
+            if (closestEntityHitPos.y >= headThreshold) {
+                damage *= properties.headshotMultiplier();
+                player.sendMessage(Text.literal("§c✦ Headshot!"), true);
+
+                world.playSoundFromEntity(
+                        null, player,
+                        SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
+                        SoundCategory.PLAYERS,
+                        0.8f, 2.0f
+                );
             }
+
+            living.damage(world, player.getDamageSources().playerAttack(player), damage);
         }
 
         // Impact particles
         if (hitPos != null) {
-            world.spawnParticles(
-                    ParticleTypes.CRIT,
-                    hitPos.x, hitPos.y, hitPos.z,
-                    5, 0.1, 0.1, 0.1, 0.01
-            );
+            if (hitLava) {
+                world.spawnParticles(
+                        ParticleTypes.LAVA,
+                        hitPos.x, hitPos.y, hitPos.z,
+                        2, 0.2, 0.2, 0.2, 0.01
+                );
+                world.playSound(null, BlockPos.ofFloored(hitPos),
+                        SoundEvents.BLOCK_LAVA_EXTINGUISH,
+                        SoundCategory.BLOCKS, 0.4f, 1.0f);
+            } else {
+                world.spawnParticles(
+                        ParticleTypes.CRIT,
+                        hitPos.x, hitPos.y, hitPos.z,
+                        5, 0.1, 0.1, 0.1, 0.01
+                );
+            }
         }
 
         // Muzzle smoke
@@ -246,7 +277,9 @@ public class GunItem extends Item {
                 1.0f, 1.0f
         );
         emitGunGameEvent(player, GameEvent.ITEM_INTERACT_START);
-        player.getItemCooldownManager().set(stack, 1);
+        if (!player.getItemCooldownManager().isCoolingDown(stack)) {
+            player.getItemCooldownManager().set(stack, 1);
+        }
     }
 
     // ── Reload ───────────────────────────────────────────────────────────
@@ -280,12 +313,54 @@ public class GunItem extends Item {
         }
     }
 
-    // ── Bullet raycast (skips transparent / non-solid blocks) ────────────
+    // ── Fluid interaction along bullet path ──────────────────────────────
+
+    /**
+     * Steps along the bullet path checking for fluid transitions.
+     * Spawns splash particles/sounds at water entry/exit points.
+     * Returns the position where the bullet enters lava (null if it doesn't).
+     */
+    private static Vec3d handleFluidInteractions(ServerWorld world, Vec3d start, Vec3d bulletEnd, Vec3d direction) {
+        double totalDist = start.distanceTo(bulletEnd);
+        double stepSize = 0.25;
+        boolean wasInWater = world.getFluidState(BlockPos.ofFloored(start)).isIn(FluidTags.WATER);
+
+        for (double d = stepSize; d <= totalDist; d += stepSize) {
+            Vec3d pos = start.add(direction.multiply(d));
+            BlockPos blockPos = BlockPos.ofFloored(pos);
+            FluidState fluidState = world.getFluidState(blockPos);
+
+            if (fluidState.isIn(FluidTags.LAVA)) {
+                return pos;
+            }
+
+            boolean inWater = fluidState.isIn(FluidTags.WATER);
+            if (inWater != wasInWater) {
+                world.spawnParticles(
+                        ParticleTypes.SPLASH,
+                        pos.x, pos.y, pos.z,
+                        8, 0.15, 0.05, 0.15, 0.05
+                );
+                world.playSound(null, blockPos,
+                        SoundEvents.ENTITY_GENERIC_SPLASH,
+                        SoundCategory.BLOCKS, 0.6f, 1.4f);
+            }
+            wasInWater = inWater;
+        }
+        return null;
+    }
+
+    // ── Bullet raycast ───────────────────────────────────────────────────
+    // Uses COLLIDER shapes so bullets respect actual block geometry:
+    //   - Grass/flowers/torches: no collider → bullet passes through
+    //   - Fences: post/rail collider with gaps → bullet passes through holes
+    //   - Glass: full collider → bullet shatters the glass and continues
+    //   - Solid blocks: bullet stops
 
     protected static BlockHitResult raycastFiltered(ServerWorld world, Vec3d start, Vec3d end, Vec3d direction, Entity shooter) {
         BlockHitResult result = world.raycast(new RaycastContext(
                 start, end,
-                RaycastContext.ShapeType.OUTLINE,
+                RaycastContext.ShapeType.COLLIDER,
                 RaycastContext.FluidHandling.NONE,
                 shooter
         ));
@@ -295,19 +370,31 @@ public class GunItem extends Item {
             BlockPos hitBlock = result.getBlockPos();
             BlockState state = world.getBlockState(hitBlock);
 
-            if (state.isSolidBlock(world, hitBlock)) {
+            if (isBulletBreakableGlass(state)) {
+                world.breakBlock(hitBlock, false, shooter);
+            } else {
                 return result;
             }
 
             Vec3d past = result.getPos().add(direction.multiply(0.01));
             result = world.raycast(new RaycastContext(
                     past, end,
-                    RaycastContext.ShapeType.OUTLINE,
+                    RaycastContext.ShapeType.COLLIDER,
                     RaycastContext.FluidHandling.NONE,
                     shooter
             ));
         }
 
         return result;
+    }
+
+    private static boolean isBulletBreakableGlass(BlockState state) {
+        // Full glass blocks (clear, stained, tinted) — IMPERMEABLE tag covers these, minus ice
+        if (state.isIn(BlockTags.IMPERMEABLE) && !state.isOf(Blocks.ICE)) {
+            return true;
+        }
+        // Glass panes (but not iron bars or copper panes which also extend PaneBlock)
+        return state.getBlock() instanceof StainedGlassPaneBlock
+                || state.isOf(Blocks.GLASS_PANE);
     }
 }

@@ -4,10 +4,10 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.item.Item;
 import net.minecraft.server.network.ServerPlayerEntity;
 import org.voximir.sahu.items.GunItem;
-import org.voximir.sahu.packets.ReloadPacket;
+import org.voximir.sahu.packets.ReloadC2SPayload;
 import org.voximir.sahu.packets.StartFireC2SPayload;
 import org.voximir.sahu.packets.StopFireC2SPayload;
-import org.voximir.sahu.packets.SwitchPacket;
+import org.voximir.sahu.packets.SwitchFireModeC2SPayload;
 
 import static org.voximir.sahu.Sahu.LOGGER;
 
@@ -38,7 +38,7 @@ public class ModNetworking {
 
         // ── Reload ───────────────────────────────────────────────────────
         ServerPlayNetworking.registerGlobalReceiver(
-                ReloadPacket.ID, (payload, context) -> {
+                ReloadC2SPayload.ID, (payload, context) -> {
                     ServerPlayerEntity player = context.player();
                     context.server().execute(() -> {
                         Item item = player.getMainHandStack().getItem();
@@ -51,7 +51,7 @@ public class ModNetworking {
 
         // ── Switch mode ──────────────────────────────────────────────────
         ServerPlayNetworking.registerGlobalReceiver(
-                SwitchPacket.ID, (payload, context) -> {
+                SwitchFireModeC2SPayload.ID, (payload, context) -> {
                     ServerPlayerEntity player = context.player();
                     context.server().execute(() -> {
                         Item item = player.getMainHandStack().getItem();

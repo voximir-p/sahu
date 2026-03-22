@@ -4,38 +4,39 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.Identifier;
+import org.voximir.sahu.items.GunSounds;
 
 import static org.voximir.sahu.Sahu.LOGGER;
 import static org.voximir.sahu.Sahu.MOD_ID;
 
 public class ModSoundEvents {
 
-    public static final Identifier TAURUS_PT_2_47_MAGIN_ID = Identifier.of(MOD_ID, "taurus_pt_24_7_magin");
-    public static final SoundEvent TAURUS_PT_2_47_MAGIN = SoundEvent.of(TAURUS_PT_2_47_MAGIN_ID);
+    // ── Taurus PT 24/7 ──────────────────────────────────────────────────
 
-    public static final Identifier TAURUS_PT_2_47_RELOAD_ID = Identifier.of(MOD_ID, "taurus_pt_24_7_reload");
-    public static final SoundEvent TAURUS_PT_2_47_RELOAD = SoundEvent.of(TAURUS_PT_2_47_RELOAD_ID);
+    public static final SoundEvent TAURUS_PT_24_7_SHOOT  = register("taurus_pt_24_7_shoot");
+    public static final SoundEvent TAURUS_PT_24_7_EMPTY  = register("taurus_pt_24_7_empty");
+    public static final SoundEvent TAURUS_PT_24_7_SWITCH = register("taurus_pt_24_7_switch");
+    public static final SoundEvent TAURUS_PT_24_7_MAGIN  = register("taurus_pt_24_7_magin");
+    public static final SoundEvent TAURUS_PT_24_7_RELOAD = register("taurus_pt_24_7_reload");
 
-    public static final Identifier TAURUS_PT_2_47_SHOOT_ID = Identifier.of(MOD_ID, "taurus_pt_24_7_shoot");
-    public static final SoundEvent TAURUS_PT_2_47_SHOOT = SoundEvent.of(TAURUS_PT_2_47_SHOOT_ID);
+    public static final GunSounds TAURUS_PT_24_7_SOUNDS = new GunSounds(
+            TAURUS_PT_24_7_SHOOT,
+            TAURUS_PT_24_7_EMPTY,
+            TAURUS_PT_24_7_SWITCH,
+            TAURUS_PT_24_7_MAGIN,
+            TAURUS_PT_24_7_RELOAD
+    );
 
-    public static final Identifier TAURUS_PT_2_47_SWITCH_ID = Identifier.of(MOD_ID, "taurus_pt_24_7_switch");
-    public static final SoundEvent TAURUS_PT_2_47_SWITCH = SoundEvent.of(TAURUS_PT_2_47_SWITCH_ID);
+    // ── Registration helper ──────────────────────────────────────────────
 
-    public static final Identifier TAURUS_PT_2_47_EMPTY_ID = Identifier.of(MOD_ID, "taurus_pt_24_7_empty");
-    public static final SoundEvent TAURUS_PT_2_47_EMPTY = SoundEvent.of(TAURUS_PT_2_47_EMPTY_ID);
-
-    private static void registerSound(Identifier identifier, SoundEvent soundevent) {
-        Registry.register(Registries.SOUND_EVENT, identifier, soundevent);
+    private static SoundEvent register(String name) {
+        Identifier id = Identifier.of(MOD_ID, name);
+        SoundEvent event = SoundEvent.of(id);
+        Registry.register(Registries.SOUND_EVENT, id, event);
+        return event;
     }
 
     public static void initialize() {
-        registerSound(TAURUS_PT_2_47_MAGIN_ID, TAURUS_PT_2_47_MAGIN);
-        registerSound(TAURUS_PT_2_47_RELOAD_ID, TAURUS_PT_2_47_RELOAD);
-        registerSound(TAURUS_PT_2_47_SHOOT_ID, TAURUS_PT_2_47_SHOOT);
-        registerSound(TAURUS_PT_2_47_SWITCH_ID, TAURUS_PT_2_47_SWITCH);
-        registerSound(TAURUS_PT_2_47_EMPTY_ID, TAURUS_PT_2_47_EMPTY);
-
         LOGGER.info("ModSoundEvents initialized");
     }
 }

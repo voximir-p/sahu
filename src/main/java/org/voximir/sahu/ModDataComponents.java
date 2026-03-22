@@ -21,17 +21,15 @@ public class ModDataComponents {
                     .build()
     );
 
-    // 0 = FULL_AUTO, 1 = SINGLE
-    public static final ComponentType<Integer> FIRE_MODE = Registry.register(
+    public static final ComponentType<FireMode> FIRE_MODE = Registry.register(
             Registries.DATA_COMPONENT_TYPE,
             Identifier.of(MOD_ID, "fire_mode"),
-            ComponentType.<Integer>builder()
-                    .codec(Codec.INT)
-                    .packetCodec(PacketCodecs.VAR_INT)
+            ComponentType.<FireMode>builder()
+                    .codec(Codec.INT.xmap(FireMode::fromId, FireMode::getId))
+                    .packetCodec(PacketCodecs.VAR_INT.xmap(FireMode::fromId, FireMode::getId))
                     .build()
     );
 
-    // true while a reload is in progress (ammo refills when cooldown ends)
     public static final ComponentType<Boolean> RELOADING = Registry.register(
             Registries.DATA_COMPONENT_TYPE,
             Identifier.of(MOD_ID, "reloading"),
@@ -42,7 +40,6 @@ public class ModDataComponents {
     );
 
     public static void initialize() {
-        // Force static fields to load
         LOGGER.info("ModDataComponents initialized");
     }
 }

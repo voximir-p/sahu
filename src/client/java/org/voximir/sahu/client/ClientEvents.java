@@ -4,10 +4,10 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.item.Item;
 import org.voximir.sahu.items.GunItem;
-import org.voximir.sahu.packets.ReloadPacket;
+import org.voximir.sahu.packets.ReloadC2SPayload;
 import org.voximir.sahu.packets.StartFireC2SPayload;
 import org.voximir.sahu.packets.StopFireC2SPayload;
-import org.voximir.sahu.packets.SwitchPacket;
+import org.voximir.sahu.packets.SwitchFireModeC2SPayload;
 
 import static org.voximir.sahu.client.ModKeyMappings.RELOAD_KEYBIND;
 import static org.voximir.sahu.client.ModKeyMappings.SWITCH_KEYBIND;
@@ -43,10 +43,10 @@ public class ClientEvents {
             // Reload / switch — wasPressed() so they only fire once per key press
             if (holdingGun) {
                 while (RELOAD_KEYBIND.wasPressed()) {
-                    ClientPlayNetworking.send(new ReloadPacket());
+                    ClientPlayNetworking.send(new ReloadC2SPayload());
                 }
                 while (SWITCH_KEYBIND.wasPressed()) {
-                    ClientPlayNetworking.send(new SwitchPacket());
+                    ClientPlayNetworking.send(new SwitchFireModeC2SPayload());
                 }
             }
         });

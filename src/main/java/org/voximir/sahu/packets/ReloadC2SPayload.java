@@ -7,11 +7,12 @@ import net.minecraft.util.Identifier;
 
 import static org.voximir.sahu.Sahu.MOD_ID;
 
-public record SwitchPacket() implements CustomPayload {
+public record ReloadC2SPayload() implements CustomPayload {
 
-    public static final Id<SwitchPacket> ID = new Id<>(Identifier.of(MOD_ID, "switch"));
+    public static final Id<ReloadC2SPayload> ID = new Id<>(Identifier.of(MOD_ID, "reload"));
 
-    public static final PacketCodec<RegistryByteBuf, SwitchPacket> CODEC = PacketCodec.unit(new SwitchPacket());
+    public static final PacketCodec<RegistryByteBuf, ReloadC2SPayload> CODEC =
+            PacketCodec.unit(new ReloadC2SPayload());
 
     @Override
     public Id<? extends CustomPayload> getId() {

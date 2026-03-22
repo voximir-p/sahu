@@ -1,5 +1,6 @@
 package org.voximir.sahu.client;
 
+import org.voximir.sahu.FireMode;
 import org.voximir.sahu.ModDataComponents;
 import static org.voximir.sahu.Sahu.MOD_ID;
 import org.voximir.sahu.items.GunItem;
@@ -41,7 +42,7 @@ public class AmmoHudOverlay implements HudElement {
             int textWidth = textRenderer.getWidth(text);
             int x = screenWidth - textWidth - 9;
             int y = screenHeight - 16;
-            context.drawTextWithShadow(textRenderer, text, x, y, 0xFF070707);
+            context.drawTextWithShadow(textRenderer, text, x, y, 0xFF808080);
         } else {
             int ammo = stack.getOrDefault(ModDataComponents.AMMO, gun.getMaxAmmo());
             int maxAmmo = gun.getMaxAmmo();
@@ -65,9 +66,9 @@ public class AmmoHudOverlay implements HudElement {
         }
 
         // ── Fire mode indicator (above ammo line) ────────────────────────
-        int fireMode = stack.getOrDefault(ModDataComponents.FIRE_MODE, GunItem.MODE_FULL_AUTO);
-        String modeText = (fireMode == GunItem.MODE_SINGLE) ? "SINGLE" : "AUTO";
-        int modeColor = (fireMode == GunItem.MODE_SINGLE) ? 0xFFAAAAFF : 0xFFFFAA55;
+        FireMode fireMode = stack.getOrDefault(ModDataComponents.FIRE_MODE, FireMode.FULL_AUTO);
+        String modeText = (fireMode == FireMode.SINGLE) ? "SINGLE" : "AUTO";
+        int modeColor = (fireMode == FireMode.SINGLE) ? 0xFFAAAAFF : 0xFFFFAA55;
         int modeWidth = textRenderer.getWidth(modeText);
         int modeX = screenWidth - modeWidth - 9;
         int modeY = screenHeight - 26;

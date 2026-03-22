@@ -1,6 +1,6 @@
 {
   "model": {
     "type": "minecraft:model",
-    "model": "example-mod:item/suspicious_substance"
+    "model": "sahu:item/taurus_pt_24_7"
   }
 }

@@ -1,16 +1,25 @@
 package org.voximir.sahu;
 
-import net.fabricmc.api.ModInitializer;
-
 import java.util.logging.Logger;
+
+import net.fabricmc.api.ModInitializer;
 
 public class Sahu implements ModInitializer {
 
-    public static String MOD_ID = "sahu";
-    public static Logger LOGGER = Logger.getLogger(MOD_ID);
+    public static final String MOD_ID = "sahu";
+    public static final Logger LOGGER = Logger.getLogger(MOD_ID);
 
     @Override
     public void onInitialize() {
-        LOGGER.info("Hello, Fabric!");
+        ModDataComponents.initialize();
+        ModSoundEvents.initialize();
+        ModItems.initialize();
+        ModItemGroups.initialize();
+
+        ModPackets.initialize();
+        ModNetworking.initialize();
+        FiringManager.initialize();
+
+        LOGGER.info("Sahu mod initialized");
     }
 }

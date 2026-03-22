@@ -4,11 +4,14 @@
   "package": "org.voximir.sahu.mixin.client",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "MinecraftClientMixin",
+    "GameRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "overwrites": {
     "requireAnnotations": true
-  }
+  },
+  "mixins": []
 }

@@ -1,18 +1,32 @@
 {
   "taurus_pt_24_7_magin": {
     "subtitle": "sound.sahu.taurus_pt_24_7_magin",
-    "sounds": ["sahu:taurus_pt_247/taurus_pt_24_7_magin"]
+    "sounds": [
+      "sahu:taurus_pt_24_7/taurus_pt_24_7_magin"
+    ]
   },
   "taurus_pt_24_7_reload": {
     "subtitle": "sound.sahu.taurus_pt_24_7_reload",
-    "sounds": ["sahu:taurus_pt_247/taurus_pt_24_7_reload"]
+    "sounds": [
+      "sahu:taurus_pt_24_7/taurus_pt_24_7_reload"
+    ]
   },
   "taurus_pt_24_7_shoot": {
     "subtitle": "sound.sahu.taurus_pt_24_7_shoot",
-    "sounds": ["sahu:taurus_pt_247/taurus_pt_24_7_shoot"]
+    "sounds": [
+      "sahu:taurus_pt_24_7/taurus_pt_24_7_shoot"
+    ]
   },
   "taurus_pt_24_7_switch": {
     "subtitle": "sound.sahu.taurus_pt_24_7_switch",
-    "sounds": ["sahu:taurus_pt_247/taurus_pt_24_7_switch"]
+    "sounds": [
+      "sahu:taurus_pt_24_7/taurus_pt_24_7_switch"
+    ]
+  },
+  "taurus_pt_24_7_empty": {
+    "subtitle": "sound.sahu.taurus_pt_24_7_empty",
+    "sounds": [
+      "sahu:taurus_pt_24_7/taurus_pt_24_7_empty"
+    ]
   }
 }

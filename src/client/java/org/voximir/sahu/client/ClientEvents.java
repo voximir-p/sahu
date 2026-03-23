@@ -51,6 +51,8 @@ public class ClientEvents {
             }
         });
 
+        ClientTickEvents.END_CLIENT_TICK.register(AimState::tick);
+
         // Recoil + screen-shake tick handlers
         ClientTickEvents.END_CLIENT_TICK.register(RecoilHandler::tick);
         ClientTickEvents.END_CLIENT_TICK.register(ScreenShakeHandler::tick);

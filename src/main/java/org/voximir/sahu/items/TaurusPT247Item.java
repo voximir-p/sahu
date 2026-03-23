@@ -10,6 +10,8 @@ public class TaurusPT247Item extends GunItem {
             50.0,   // range
             8.0f,   // baseDamage
             2.0f,   // headshotMultiplier
+            0.75f,  // hipFireAccuracy
+            0.90f,  // aimedAccuracy
             -12.0f, // recoilPitch
             2.5f,   // recoilYaw
             5,      // recoilDuration

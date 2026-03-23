@@ -18,6 +18,7 @@ public class ModDataComponents {
             ComponentType.<Integer>builder()
                     .codec(Codec.INT)
                     .packetCodec(PacketCodecs.VAR_INT)
+                    .skipsHandAnimation()
                     .build()
     );
 
@@ -27,6 +28,7 @@ public class ModDataComponents {
             ComponentType.<FireMode>builder()
                     .codec(Codec.INT.xmap(FireMode::fromId, FireMode::getId))
                     .packetCodec(PacketCodecs.VAR_INT.xmap(FireMode::fromId, FireMode::getId))
+                    .skipsHandAnimation()
                     .build()
     );
 
@@ -36,6 +38,17 @@ public class ModDataComponents {
             ComponentType.<Boolean>builder()
                     .codec(Codec.BOOL)
                     .packetCodec(PacketCodecs.BOOLEAN)
+                    .skipsHandAnimation()
+                    .build()
+    );
+
+    public static final ComponentType<Boolean> AIMING = Registry.register(
+            Registries.DATA_COMPONENT_TYPE,
+            Identifier.of(MOD_ID, "aiming"),
+            ComponentType.<Boolean>builder()
+                    .codec(Codec.BOOL)
+                    .packetCodec(PacketCodecs.BOOLEAN)
+                    .skipsHandAnimation()
                     .build()
     );
 

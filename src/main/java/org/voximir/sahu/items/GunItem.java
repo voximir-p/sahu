@@ -1,5 +1,14 @@
 package org.voximir.sahu.items;
 
+import software.bernie.geckolib.animatable.GeoItem;
+import software.bernie.geckolib.animatable.client.GeoRenderProvider;
+import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
+import software.bernie.geckolib.animatable.manager.AnimatableManager;
+import software.bernie.geckolib.animation.AnimationController;
+import software.bernie.geckolib.animation.RawAnimation;
+import software.bernie.geckolib.animation.object.PlayState;
+import software.bernie.geckolib.renderer.GeoItemRenderer;
+import software.bernie.geckolib.util.GeckoLibUtil;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -23,6 +32,7 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
@@ -33,23 +43,96 @@ import org.voximir.sahu.ModDataComponents;
 import org.voximir.sahu.packets.RecoilS2CPayload;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Base gun item with data-driven configuration via {@link GunProperties}.
+ * Implements {@link GeoItem} for GeckoLib-powered 3D rendering and animation.
  * Provides a default hitscan firing implementation. Subclasses can override
  * {@link #fire(ServerPlayerEntity)} for custom behavior (e.g. projectile guns).
  */
-public class GunItem extends Item {
+public class GunItem extends Item implements GeoItem {
+
+    // ── GeckoLib animation definitions ───────────────────────────────────
+
+    private static final RawAnimation SHOOT_ANIM = RawAnimation.begin().thenPlay("shoot");
+    private static final RawAnimation RELOAD_ANIM = RawAnimation.begin().thenPlay("reload");
+    private static final RawAnimation MAGIN_ANIM = RawAnimation.begin().thenPlay("magin");
+    private static final RawAnimation AIM_ANIM = RawAnimation.begin().thenPlay("aim");
+    private static final RawAnimation UNAIM_ANIM = RawAnimation.begin().thenPlay("unaim");
+
+    private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     protected final GunProperties properties;
 
     public GunItem(Settings settings, GunProperties properties) {
         super(settings);
         this.properties = properties;
+        GeoItem.registerSyncedAnimatable(this);
+    }
+
+    // ── GeoItem implementation ───────────────────────────────────────────
+
+    @Override
+    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+        controllers.add(new AnimationController<GunItem>("gun_controller", 2, state -> PlayState.STOP)
+                .triggerableAnim("shoot", SHOOT_ANIM)
+                .triggerableAnim("reload", RELOAD_ANIM)
+                .triggerableAnim("magin", MAGIN_ANIM));
+        controllers.add(new AnimationController<GunItem>("aim_controller", 0, state -> PlayState.STOP)
+            .triggerableAnim("aim", AIM_ANIM)
+            .triggerableAnim("unaim", UNAIM_ANIM));
+    }
+
+    @Override
+    public AnimatableInstanceCache getAnimatableInstanceCache() {
+        return cache;
+    }
+
+    @Override
+    public void createGeoRenderer(Consumer<GeoRenderProvider> consumer) {
+        consumer.accept(new GeoRenderProvider() {
+            private GeoItemRenderer<GunItem> renderer;
+
+            @Override
+            public GeoItemRenderer<?> getGeoItemRenderer() {
+                if (this.renderer == null)
+                    this.renderer = new GeoItemRenderer<>(GunItem.this);
+                return this.renderer;
+            }
+        });
     }
 
     public GunProperties getProperties() {
         return properties;
+    }
+
+    public void triggerAimAnimation(Entity holder, ItemStack stack) {
+        triggerAnim(holder, GeoItem.getId(stack), "aim_controller", "aim");
+    }
+
+    public void triggerUnaimAnimation(Entity holder, ItemStack stack) {
+        long instanceId = GeoItem.getId(stack);
+        stopTriggeredAnim(holder, instanceId, "aim_controller", "aim");
+        triggerAnim(holder, instanceId, "aim_controller", "unaim");
+    }
+
+    public void startAim(ServerPlayerEntity player) {
+        ItemStack stack = player.getMainHandStack();
+        long instanceId = GeoItem.getOrAssignId(stack, (ServerWorld) player.getEntityWorld());
+
+        setAiming(stack, true);
+        stopTriggeredAnim(player, instanceId, "aim_controller", "unaim");
+        triggerAnim(player, instanceId, "aim_controller", "aim");
+    }
+
+    public void stopAim(ServerPlayerEntity player) {
+        ItemStack stack = player.getMainHandStack();
+        long instanceId = GeoItem.getOrAssignId(stack, (ServerWorld) player.getEntityWorld());
+
+        setAiming(stack, false);
+        stopTriggeredAnim(player, instanceId, "aim_controller", "aim");
+        triggerAnim(player, instanceId, "aim_controller", "unaim");
     }
 
     // ── Convenience accessors ────────────────────────────────────────────
@@ -92,6 +175,14 @@ public class GunItem extends Item {
         stack.set(ModDataComponents.RELOADING, value);
     }
 
+    public boolean isAiming(ItemStack stack) {
+        return stack.getOrDefault(ModDataComponents.AIMING, false);
+    }
+
+    public void setAiming(ItemStack stack, boolean value) {
+        stack.set(ModDataComponents.AIMING, value);
+    }
+
     // ── Game event emission (Warden / sculk) ─────────────────────────────
 
     protected void emitGunGameEvent(ServerPlayerEntity player, RegistryEntry<GameEvent> event) {
@@ -126,6 +217,9 @@ public class GunItem extends Item {
         fire(player);
         setAmmo(stack, ammo - 1);
 
+        // Trigger GeckoLib shoot animation
+        triggerAnim(player, GeoItem.getOrAssignId(stack, (ServerWorld) player.getEntityWorld()), "gun_controller", "shoot");
+
         float yawKick = player.getRandom().nextBoolean()
                 ? properties.recoilYaw()
                 : -properties.recoilYaw();
@@ -144,9 +238,10 @@ public class GunItem extends Item {
 
     protected void fire(ServerPlayerEntity player) {
         ServerWorld world = player.getEntityWorld();
+        ItemStack stack = player.getMainHandStack();
 
         Vec3d start = player.getEyePos();
-        Vec3d direction = player.getRotationVec(1.0f);
+        Vec3d direction = applyInaccuracy(player.getRotationVec(1.0f), getCurrentAccuracy(player, stack), world.random);
         Vec3d end = start.add(direction.multiply(properties.range()));
 
         // Block raycast (passes through non-solid blocks)
@@ -254,6 +349,44 @@ public class GunItem extends Item {
         emitGunGameEvent(player, GameEvent.PROJECTILE_SHOOT);
     }
 
+    private float getCurrentAccuracy(ServerPlayerEntity player, ItemStack stack) {
+        float baseAccuracy = isAiming(stack) ? properties.aimedAccuracy() : properties.hipFireAccuracy();
+        float movementModifier;
+
+        if (player.isSwimming() || player.isSprinting() || !player.isOnGround()) {
+            movementModifier = -0.25f;
+        } else if (player.isSneaking()) {
+            movementModifier = 0.05f;
+        } else if (isWalking(player)) {
+            movementModifier = -0.10f;
+        } else {
+            movementModifier = 0.0f;
+        }
+
+        return MathHelper.clamp(baseAccuracy + movementModifier, 0.0f, 1.0f);
+    }
+
+    private static boolean isWalking(ServerPlayerEntity player) {
+        double horizontalSpeedSq = player.getVelocity().horizontalLengthSquared();
+
+        return horizontalSpeedSq > 0.0004;
+    }
+
+    private static Vec3d applyInaccuracy(Vec3d direction, float accuracy, net.minecraft.util.math.random.Random random) {
+        float clampedAccuracy = MathHelper.clamp(accuracy, 0.0f, 1.0f);
+        float inaccuracy = 1.0f - clampedAccuracy;
+
+        if (inaccuracy <= 0.0f) {
+            return direction;
+        }
+
+        float maxSpreadRadians = (float) Math.toRadians(12.0f * inaccuracy);
+        float yawOffset = (random.nextFloat() * 2.0f - 1.0f) * maxSpreadRadians;
+        float pitchOffset = (random.nextFloat() * 2.0f - 1.0f) * maxSpreadRadians;
+
+        return direction.rotateY(yawOffset).rotateX(pitchOffset).normalize();
+    }
+
     // ── Switch mode ──────────────────────────────────────────────────────
 
     public void switchMode(ServerPlayerEntity player) {
@@ -292,6 +425,10 @@ public class GunItem extends Item {
             return;
 
         boolean hasAmmo = getAmmo(stack) > 0;
+
+        // Trigger GeckoLib reload animation (tactical = magin, full = reload)
+        triggerAnim(player, GeoItem.getOrAssignId(stack, (ServerWorld) player.getEntityWorld()),
+                "gun_controller", hasAmmo ? "magin" : "reload");
 
         world.playSoundFromEntity(
                 null, player,

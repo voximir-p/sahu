@@ -1,6 +1,9 @@
 {
   "model": {
-    "type": "minecraft:model",
-    "model": "sahu:item/taurus_pt_24_7"
+    "type": "minecraft:special",
+    "base": "sahu:item/taurus_pt_24_7",
+    "model": {
+      "type": "geckolib:geckolib"
+    }
   }
 }

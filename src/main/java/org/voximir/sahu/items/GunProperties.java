@@ -6,6 +6,8 @@ public record GunProperties(
         double range,
         float baseDamage,
         float headshotMultiplier,
+    float hipFireAccuracy,
+    float aimedAccuracy,
         float recoilPitch,
         float recoilYaw,
         int recoilDuration,

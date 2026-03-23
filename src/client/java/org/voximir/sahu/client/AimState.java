@@ -14,14 +14,18 @@ public final class AimState {
     private static final float ADS_FOV_MULTIPLIER = 0.75f;
     private static final float SNEAK_FOV_MULTIPLIER = 0.75f;
     private static final float EXPO_OUT_POWER = 3.0f;
+    private static final float MAX_FOV_RANGE = 1.0f - (ADS_FOV_MULTIPLIER * SNEAK_FOV_MULTIPLIER);
 
+    // Aim state (for animations / server sync)
     private static boolean aiming;
-    private static float aimProgress;
-    private static float lastAimProgress;
-    private static float transitionStartProgress;
-    private static float transitionTargetProgress;
-    private static float transitionDurationTicks;
-    private static float transitionElapsedTicks;
+
+    // Unified FOV transition
+    private static float fovMultiplier = 1.0f;
+    private static float lastFovMultiplier = 1.0f;
+    private static float fovTransitionStart;
+    private static float fovTransitionTarget = 1.0f;
+    private static float fovTransitionDuration;
+    private static float fovTransitionElapsed;
 
     private AimState() {}
 
@@ -40,8 +44,26 @@ public final class AimState {
         return (float) (numerator / denominator);
     }
 
+    private static float computeTargetFovMultiplier(ClientPlayerEntity player, boolean holdingGun) {
+        if (!holdingGun) {
+            return 1.0f;
+        }
+
+        float target = 1.0f;
+
+        if (aiming) {
+            target *= ADS_FOV_MULTIPLIER;
+
+            if (player.isSneaking()) {
+                target *= SNEAK_FOV_MULTIPLIER;
+            }
+        }
+
+        return target;
+    }
+
     public static void tick(MinecraftClient client) {
-        lastAimProgress = aimProgress;
+        lastFovMultiplier = fovMultiplier;
 
         ClientPlayerEntity player = client.player;
         ItemStack stack = player == null ? ItemStack.EMPTY : player.getMainHandStack();
@@ -58,55 +80,42 @@ public final class AimState {
             }
         }
 
-        if (aiming != desiredAiming) {
-            aiming = desiredAiming;
-            transitionStartProgress = aimProgress;
-            transitionTargetProgress = aiming ? 1.0f : 0.0f;
-            transitionDurationTicks = Math.max(1.0f,
-                    TRANSITION_TICKS * Math.abs(transitionTargetProgress - transitionStartProgress));
-            transitionElapsedTicks = 0.0f;
+        aiming = desiredAiming;
+
+        // Compute the desired FOV multiplier based on current state
+        float newTarget = player == null ? 1.0f : computeTargetFovMultiplier(player, holdingGun);
+
+        // If the target changed, start a new transition from the current value
+        if (newTarget != fovTransitionTarget) {
+            fovTransitionStart = fovMultiplier;
+            fovTransitionTarget = newTarget;
+            float normalizedDistance = Math.abs(fovTransitionTarget - fovTransitionStart) / MAX_FOV_RANGE;
+            fovTransitionDuration = Math.max(1.0f, TRANSITION_TICKS * normalizedDistance);
+            fovTransitionElapsed = 0.0f;
         }
 
-        if (aimProgress != transitionTargetProgress) {
-            transitionElapsedTicks = Math.min(transitionDurationTicks, transitionElapsedTicks + 1.0f);
-            float progress = transitionElapsedTicks / transitionDurationTicks;
+        // Advance the transition
+        if (fovMultiplier != fovTransitionTarget) {
+            fovTransitionElapsed = Math.min(fovTransitionDuration, fovTransitionElapsed + 1.0f);
+            float progress = fovTransitionElapsed / fovTransitionDuration;
             float easedProgress = easeOutExpo(progress);
-            aimProgress = transitionStartProgress + (transitionTargetProgress - transitionStartProgress) * easedProgress;
+            fovMultiplier = fovTransitionStart + (fovTransitionTarget - fovTransitionStart) * easedProgress;
         } else {
-            transitionElapsedTicks = 0.0f;
+            fovTransitionElapsed = 0.0f;
         }
     }
 
-    public static float getAimProgress(float tickDelta) {
-        return lastAimProgress + (aimProgress - lastAimProgress) * tickDelta;
+    public static boolean isAiming() {
+        return aiming;
     }
 
     public static float applyGunFov(float baseFov, float tickDelta) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        ClientPlayerEntity player = client == null ? null : client.player;
-        if (player == null) {
+        float multiplier = lastFovMultiplier + (fovMultiplier - lastFovMultiplier) * tickDelta;
+
+        if (multiplier >= 1.0f) {
             return baseFov;
         }
 
-        ItemStack stack = player.getMainHandStack();
-        if (!(stack.getItem() instanceof GunItem)) {
-            return baseFov;
-        }
-
-        float fov = baseFov;
-
-        // Apply sneak zoom
-        if (player.isSneaking()) {
-            fov *= SNEAK_FOV_MULTIPLIER;
-        }
-
-        // Apply ADS zoom
-        float progress = getAimProgress(tickDelta);
-        if (progress > 0.0f) {
-            float aimedFov = fov * ADS_FOV_MULTIPLIER;
-            fov = fov + (aimedFov - fov) * progress;
-        }
-
-        return fov;
+        return baseFov * multiplier;
     }
 }

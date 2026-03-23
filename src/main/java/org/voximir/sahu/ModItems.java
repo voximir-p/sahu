@@ -37,6 +37,7 @@ public class ModItems {
 
     public static void initialize() {
         addToCreativeTabs(TAURUS_PT_24_7, ModItemGroups.SAHU_CREATIVE_TAB_KEY);
+        addToCreativeTabs(NINE_MM, ModItemGroups.SAHU_CREATIVE_TAB_KEY);
 
         LOGGER.info("ModItems initialized");
     }

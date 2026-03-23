@@ -14,7 +14,7 @@ public class TaurusPT247Item extends GunItem {
             0.90f,  // aimedAccuracy
             -12.0f, // recoilPitch
             2.5f,   // recoilYaw
-            5,      // recoilDuration
+            4,      // recoilDuration
             19,     // tacticalReloadDuration
             30,     // fullReloadDuration
             ModSoundEvents.TAURUS_PT_24_7_SOUNDS

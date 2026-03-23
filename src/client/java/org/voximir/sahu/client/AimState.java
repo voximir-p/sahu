@@ -10,7 +10,7 @@ import org.voximir.sahu.packets.StopAimC2SPayload;
 
 public final class AimState {
 
-    private static final float TRANSITION_TICKS = 10.0f;
+    private static final float TRANSITION_TICKS = 5.0f;
     private static final float ADS_FOV_MULTIPLIER = 0.75f;
     private static final float EXPO_OUT_POWER = 3.0f;
 
@@ -22,8 +22,7 @@ public final class AimState {
     private static float transitionDurationTicks;
     private static float transitionElapsedTicks;
 
-    private AimState() {
-    }
+    private AimState() {}
 
     private static float easeOutExpo(float progress) {
         if (progress <= 0.0f) {
@@ -75,14 +74,6 @@ public final class AimState {
         } else {
             transitionElapsedTicks = 0.0f;
         }
-    }
-
-    public static boolean isAiming() {
-        return aiming;
-    }
-
-    public static boolean shouldHideCrosshair() {
-        return aimProgress > 0.0f;
     }
 
     public static float getAimProgress(float tickDelta) {

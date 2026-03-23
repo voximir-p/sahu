@@ -12,6 +12,7 @@ public final class AimState {
 
     private static final float TRANSITION_TICKS = 5.0f;
     private static final float ADS_FOV_MULTIPLIER = 0.75f;
+    private static final float SNEAK_FOV_MULTIPLIER = 0.75f;
     private static final float EXPO_OUT_POWER = 3.0f;
 
     private static boolean aiming;
@@ -80,15 +81,32 @@ public final class AimState {
         return lastAimProgress + (aimProgress - lastAimProgress) * tickDelta;
     }
 
-    public static float applyAimFov(float baseFov, float tickDelta) {
-        float progress = getAimProgress(tickDelta);
-
-        if (progress <= 0.0f) {
+    public static float applyGunFov(float baseFov, float tickDelta) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        ClientPlayerEntity player = client == null ? null : client.player;
+        if (player == null) {
             return baseFov;
         }
 
-        float aimedFov = baseFov * ADS_FOV_MULTIPLIER;
+        ItemStack stack = player.getMainHandStack();
+        if (!(stack.getItem() instanceof GunItem)) {
+            return baseFov;
+        }
 
-        return baseFov + (aimedFov - baseFov) * progress;
+        float fov = baseFov;
+
+        // Apply sneak zoom
+        if (player.isSneaking()) {
+            fov *= SNEAK_FOV_MULTIPLIER;
+        }
+
+        // Apply ADS zoom
+        float progress = getAimProgress(tickDelta);
+        if (progress > 0.0f) {
+            float aimedFov = fov * ADS_FOV_MULTIPLIER;
+            fov = fov + (aimedFov - fov) * progress;
+        }
+
+        return fov;
     }
 }

@@ -26,6 +26,6 @@ public abstract class GameRendererMixin {
 
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void onGetFov(Camera camera, float tickProgress, boolean changingFov, CallbackInfoReturnable<Float> cir) {
-        cir.setReturnValue(AimState.applyAimFov(cir.getReturnValueF(), tickProgress));
+        cir.setReturnValue(AimState.applyGunFov(cir.getReturnValueF(), tickProgress));
     }
 }

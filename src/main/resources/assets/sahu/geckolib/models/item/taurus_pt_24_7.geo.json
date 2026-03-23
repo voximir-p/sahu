@@ -12,12 +12,7 @@
 			},
 			"bones": [
 				{
-					"name": "ads_root",
-					"pivot": [0, 8, 11]
-				},
-				{
 					"name": "gun",
-					"parent": "ads_root",
 					"pivot": [0, 8, 11]
 				},
 				{

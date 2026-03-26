@@ -10,42 +10,42 @@ import software.bernie.geckolib.animation.object.PlayState;
 import software.bernie.geckolib.renderer.GeoItemRenderer;
 import software.bernie.geckolib.util.GeckoLibUtil;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.block.AmethystBlock;
-import net.minecraft.block.AmethystClusterBlock;
-import net.minecraft.block.BellBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.ButtonBlock;
-import net.minecraft.block.DecoratedPotBlock;
-import net.minecraft.block.StainedGlassPaneBlock;
-import net.minecraft.block.TargetBlock;
-import net.minecraft.state.property.Properties;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.fluid.FluidState;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.registry.tag.FluidTags;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
-import net.minecraft.world.World;
-import net.minecraft.world.event.GameEvent;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.AmethystBlock;
+import net.minecraft.world.level.block.AmethystClusterBlock;
+import net.minecraft.world.level.block.BellBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ButtonBlock;
+import net.minecraft.world.level.block.DecoratedPotBlock;
+import net.minecraft.world.level.block.StainedGlassPaneBlock;
+import net.minecraft.world.level.block.TargetBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import org.voximir.sahu.FireMode;
 import org.voximir.sahu.FiringManager;
 import org.voximir.sahu.ModDataComponents;
@@ -58,7 +58,7 @@ import java.util.function.Consumer;
  * Base gun item with data-driven configuration via {@link GunProperties}.
  * Implements {@link GeoItem} for GeckoLib-powered 3D rendering and animation.
  * Provides a default hitscan firing implementation. Subclasses can override
- * {@link #fire(ServerPlayerEntity)} for custom behavior (e.g. projectile guns).
+ * {@link #fire(ServerPlayer)} for custom behavior (e.g. projectile guns).
  */
 public class GunItem extends Item implements GeoItem {
 
@@ -74,7 +74,7 @@ public class GunItem extends Item implements GeoItem {
 
     protected final GunProperties properties;
 
-    public GunItem(Settings settings, GunProperties properties) {
+    public GunItem(Properties settings, GunProperties properties) {
         super(settings);
         this.properties = properties;
         GeoItem.registerSyncedAnimatable(this);
@@ -126,18 +126,18 @@ public class GunItem extends Item implements GeoItem {
         triggerAnim(holder, instanceId, "aim_controller", "unaim");
     }
 
-    public void startAim(ServerPlayerEntity player) {
-        ItemStack stack = player.getMainHandStack();
-        long instanceId = GeoItem.getOrAssignId(stack, (ServerWorld) player.getEntityWorld());
+    public void startAim(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
+        long instanceId = GeoItem.getOrAssignId(stack, (ServerLevel) player.level());
 
         setAiming(stack, true);
         stopTriggeredAnim(player, instanceId, "aim_controller", "unaim");
         triggerAnim(player, instanceId, "aim_controller", "aim");
     }
 
-    public void stopAim(ServerPlayerEntity player) {
-        ItemStack stack = player.getMainHandStack();
-        long instanceId = GeoItem.getOrAssignId(stack, (ServerWorld) player.getEntityWorld());
+    public void stopAim(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
+        long instanceId = GeoItem.getOrAssignId(stack, (ServerLevel) player.level());
 
         setAiming(stack, false);
         stopTriggeredAnim(player, instanceId, "aim_controller", "aim");
@@ -194,32 +194,32 @@ public class GunItem extends Item implements GeoItem {
 
     // ── Game event emission (Warden / sculk) ─────────────────────────────
 
-    protected void emitGunGameEvent(ServerPlayerEntity player, RegistryEntry<GameEvent> event) {
-        player.getEntityWorld().emitGameEvent(
+    protected void emitGunGameEvent(ServerPlayer player, Holder<GameEvent> event) {
+        player.level().gameEvent(
                 event,
-                player.getEyePos(),
-                GameEvent.Emitter.of(player)
+                player.getEyePosition(),
+                GameEvent.Context.of(player)
         );
     }
 
     // ── Firing logic ─────────────────────────────────────────────────────
 
-    public boolean tryFire(ServerPlayerEntity player) {
-        ItemStack stack = player.getMainHandStack();
+    public boolean tryFire(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
 
-        if (player.getItemCooldownManager().isCoolingDown(stack)) return false;
+        if (player.getCooldowns().isOnCooldown(stack)) return false;
 
         int ammo = getAmmo(stack);
         if (ammo <= 0) {
-            World world = player.getEntityWorld();
-            world.playSoundFromEntity(
+            Level world = player.level();
+            world.playSound(
                     null, player,
                     properties.sounds().emptySound(),
-                    SoundCategory.PLAYERS,
+                    SoundSource.PLAYERS,
                     1.0f, 1.0f
             );
             emitGunGameEvent(player, GameEvent.ITEM_INTERACT_START);
-            FiringManager.stopFiring(player.getUuid());
+            FiringManager.stopFiring(player.getUUID());
             return false;
         }
 
@@ -227,7 +227,7 @@ public class GunItem extends Item implements GeoItem {
         setAmmo(stack, ammo - 1);
 
         // Trigger GeckoLib shoot animation
-        triggerAnim(player, GeoItem.getOrAssignId(stack, (ServerWorld) player.getEntityWorld()), "gun_controller", "shoot");
+        triggerAnim(player, GeoItem.getOrAssignId(stack, (ServerLevel) player.level()), "gun_controller", "shoot");
 
         float yawKick = player.getRandom().nextBoolean()
                 ? properties.recoilYaw()
@@ -237,7 +237,7 @@ public class GunItem extends Item implements GeoItem {
         ));
 
         if (getFireMode(stack) == FireMode.SINGLE) {
-            FiringManager.stopFiring(player.getUuid());
+            FiringManager.stopFiring(player.getUUID());
         }
 
         return true;
@@ -245,32 +245,32 @@ public class GunItem extends Item implements GeoItem {
 
     // ── Default hitscan fire implementation ──────────────────────────────
 
-    protected void fire(ServerPlayerEntity player) {
-        ServerWorld world = player.getEntityWorld();
-        ItemStack stack = player.getMainHandStack();
+    protected void fire(ServerPlayer player) {
+        ServerLevel world = player.level();
+        ItemStack stack = player.getMainHandItem();
 
-        Vec3d start = player.getEyePos();
-        Vec3d direction = applyInaccuracy(player.getRotationVec(1.0f), getCurrentAccuracy(player, stack), world.random);
-        Vec3d end = start.add(direction.multiply(properties.range()));
+        Vec3 start = player.getEyePosition();
+        Vec3 direction = applyInaccuracy(player.getViewVector(1.0f), getCurrentAccuracy(player, stack), world.random);
+        Vec3 end = start.add(direction.scale(properties.range()));
 
         // Block raycast (passes through non-solid blocks)
         BlockHitResult blockHit = raycastFiltered(world, start, end, direction, player);
 
         // Entity raycast
-        Box searchBox = player.getBoundingBox()
-                .stretch(direction.multiply(properties.range()))
-                .expand(1.0);
+        AABB searchBox = player.getBoundingBox()
+                .expandTowards(direction.scale(properties.range()))
+                .inflate(1.0);
 
         Entity closestEntity = null;
-        Vec3d closestEntityHitPos = null;
+        Vec3 closestEntityHitPos = null;
         double closestEntityDistSq = properties.range() * properties.range();
 
-        for (Entity entity : world.getOtherEntities(player, searchBox, e -> !e.isSpectator() && e.canHit())) {
-            Box entityBox = entity.getBoundingBox().expand(0.3);
-            Optional<Vec3d> hitPos = entityBox.raycast(start, end);
+        for (Entity entity : world.getEntities(player, searchBox, e -> !e.isSpectator() && e.isPickable())) {
+            AABB entityBox = entity.getBoundingBox().inflate(0.3);
+            Optional<Vec3> hitPos = entityBox.clip(start, end);
 
             if (hitPos.isPresent()) {
-                double distSq = start.squaredDistanceTo(hitPos.get());
+                double distSq = start.distanceToSqr(hitPos.get());
                 if (distSq < closestEntityDistSq) {
                     closestEntityDistSq = distSq;
                     closestEntity = entity;
@@ -280,8 +280,8 @@ public class GunItem extends Item implements GeoItem {
         }
 
         // Choose the closest hit (entity vs block)
-        Vec3d hitPos = blockHit.getPos();
-        double blockDistSq = start.squaredDistanceTo(blockHit.getPos());
+        Vec3 hitPos = blockHit.getLocation();
+        double blockDistSq = start.distanceToSqr(blockHit.getLocation());
         boolean entityIsCloser = closestEntity != null && closestEntityDistSq < blockDistSq;
 
         if (entityIsCloser) {
@@ -289,10 +289,10 @@ public class GunItem extends Item implements GeoItem {
         }
 
         // Fluid interactions (water splashes + lava stopping)
-        Vec3d lavaHit = handleFluidInteractions(world, start, hitPos, direction);
+        Vec3 lavaHit = handleFluidInteractions(world, start, hitPos, direction);
         boolean hitLava = false;
 
-        if (lavaHit != null && start.squaredDistanceTo(lavaHit) < start.squaredDistanceTo(hitPos)) {
+        if (lavaHit != null && start.distanceToSqr(lavaHit) < start.distanceToSqr(hitPos)) {
             hitPos = lavaHit;
             hitLava = true;
             entityIsCloser = false;
@@ -308,36 +308,36 @@ public class GunItem extends Item implements GeoItem {
             float damage = properties.baseDamage();
 
             // Headshot detection — top 25% of bounding box
-            Box box = living.getBoundingBox();
-            double headThreshold = box.minY + box.getLengthY() * 0.75;
+            AABB box = living.getBoundingBox();
+            double headThreshold = box.minY + box.getYsize() * 0.75;
             if (closestEntityHitPos.y >= headThreshold) {
                 damage *= properties.headshotMultiplier();
-                player.sendMessage(Text.literal("§c✦ Headshot!"), true);
+                player.displayClientMessage(Component.literal("§c✦ Headshot!"), true);
 
-                world.playSoundFromEntity(
+                world.playSound(
                         null, player,
-                        SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
-                        SoundCategory.PLAYERS,
+                        SoundEvents.EXPERIENCE_ORB_PICKUP,
+                        SoundSource.PLAYERS,
                         0.8f, 2.0f
                 );
             }
 
-            living.damage(world, player.getDamageSources().playerAttack(player), damage);
+            living.hurtServer(world, player.damageSources().playerAttack(player), damage);
         }
 
         // Impact particles
         if (hitPos != null) {
             if (hitLava) {
-                world.spawnParticles(
+                world.sendParticles(
                         ParticleTypes.LAVA,
                         hitPos.x, hitPos.y, hitPos.z,
                         2, 0.2, 0.2, 0.2, 0.01
                 );
-                world.playSound(null, BlockPos.ofFloored(hitPos),
-                        SoundEvents.BLOCK_LAVA_EXTINGUISH,
-                        SoundCategory.BLOCKS, 0.4f, 1.0f);
+                world.playSound(null, BlockPos.containing(hitPos),
+                        SoundEvents.LAVA_EXTINGUISH,
+                        SoundSource.BLOCKS, 0.4f, 1.0f);
             } else {
-                world.spawnParticles(
+                world.sendParticles(
                         ParticleTypes.CRIT,
                         hitPos.x, hitPos.y, hitPos.z,
                         5, 0.1, 0.1, 0.1, 0.01
@@ -346,30 +346,30 @@ public class GunItem extends Item implements GeoItem {
         }
 
         // Muzzle smoke
-        world.spawnParticles(
+        world.sendParticles(
                 ParticleTypes.SMOKE,
                 player.getX(), player.getEyeY(), player.getZ(),
                 3, 0.05, 0.05, 0.05, 0.01
         );
 
         // Sound
-        world.playSoundFromEntity(
+        world.playSound(
                 null, player,
                 properties.sounds().shootSound(),
-                SoundCategory.PLAYERS,
+                SoundSource.PLAYERS,
                 1.0f,
                 0.9f + world.random.nextFloat() * 0.2f
         );
         emitGunGameEvent(player, GameEvent.PROJECTILE_SHOOT);
     }
 
-    private float getCurrentAccuracy(ServerPlayerEntity player, ItemStack stack) {
+    private float getCurrentAccuracy(ServerPlayer player, ItemStack stack) {
         float baseAccuracy = isAiming(stack) ? properties.aimedAccuracy() : properties.hipFireAccuracy();
         float movementModifier;
 
-        if (player.isSwimming() || player.isSprinting() || !player.isOnGround()) {
+        if (player.isSwimming() || player.isSprinting() || !player.onGround()) {
             movementModifier = -0.25f;
-        } else if (player.isSneaking()) {
+        } else if (player.isShiftKeyDown()) {
             movementModifier = 0.05f;
         } else if (isWalking(player)) {
             movementModifier = -0.10f;
@@ -377,17 +377,17 @@ public class GunItem extends Item implements GeoItem {
             movementModifier = 0.0f;
         }
 
-        return MathHelper.clamp(baseAccuracy + movementModifier, 0.0f, 1.0f);
+        return Mth.clamp(baseAccuracy + movementModifier, 0.0f, 1.0f);
     }
 
-    private static boolean isWalking(ServerPlayerEntity player) {
-        double horizontalSpeedSq = player.getVelocity().horizontalLengthSquared();
+    private static boolean isWalking(ServerPlayer player) {
+        double horizontalSpeedSq = player.getDeltaMovement().horizontalDistanceSqr();
 
         return horizontalSpeedSq > 0.0004;
     }
 
-    private static Vec3d applyInaccuracy(Vec3d direction, float accuracy, net.minecraft.util.math.random.Random random) {
-        float clampedAccuracy = MathHelper.clamp(accuracy, 0.0f, 1.0f);
+    private static Vec3 applyInaccuracy(Vec3 direction, float accuracy, net.minecraft.util.RandomSource random) {
+        float clampedAccuracy = Mth.clamp(accuracy, 0.0f, 1.0f);
         float inaccuracy = 1.0f - clampedAccuracy;
 
         if (inaccuracy <= 0.0f) {
@@ -398,67 +398,67 @@ public class GunItem extends Item implements GeoItem {
         float yawOffset = (random.nextFloat() * 2.0f - 1.0f) * maxSpreadRadians;
         float pitchOffset = (random.nextFloat() * 2.0f - 1.0f) * maxSpreadRadians;
 
-        return direction.rotateY(yawOffset).rotateX(pitchOffset).normalize();
+        return direction.yRot(yawOffset).xRot(pitchOffset).normalize();
     }
 
     // ── Switch mode ──────────────────────────────────────────────────────
 
-    public void switchMode(ServerPlayerEntity player) {
-        ItemStack stack = player.getMainHandStack();
+    public void switchMode(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
         FireMode current = getFireMode(stack);
         FireMode next = current.next();
         setFireMode(stack, next);
 
-        player.sendMessage(
-                Text.literal("Firing mode: ")
-                        .formatted(Formatting.GRAY)
-                        .append(Text.literal(next.getDisplayName()).formatted(Formatting.YELLOW)),
+        player.displayClientMessage(
+                Component.literal("Firing mode: ")
+                        .withStyle(ChatFormatting.GRAY)
+                        .append(Component.literal(next.getDisplayName()).withStyle(ChatFormatting.YELLOW)),
                 true
         );
 
-        World world = player.getEntityWorld();
-        world.playSoundFromEntity(
+        Level world = player.level();
+        world.playSound(
                 null, player,
                 properties.sounds().switchSound(),
-                SoundCategory.PLAYERS,
+                SoundSource.PLAYERS,
                 1.0f, 1.0f
         );
         emitGunGameEvent(player, GameEvent.ITEM_INTERACT_START);
-        if (!player.getItemCooldownManager().isCoolingDown(stack)) {
-            player.getItemCooldownManager().set(stack, 1);
+        if (!player.getCooldowns().isOnCooldown(stack)) {
+            player.getCooldowns().addCooldown(stack, 1);
         }
     }
 
     // ── Reload ───────────────────────────────────────────────────────────
 
-    public void tryReload(ServerPlayerEntity player) {
-        ItemStack stack = player.getMainHandStack();
-        World world = player.getEntityWorld();
+    public void tryReload(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
+        Level world = player.level();
 
-        if (player.getItemCooldownManager().isCoolingDown(stack) || getAmmo(stack) == getMaxAmmo())
+        if (player.getCooldowns().isOnCooldown(stack) || getAmmo(stack) == getMaxAmmo())
             return;
 
         boolean hasAmmo = getAmmo(stack) > 0;
 
         // Trigger GeckoLib reload animation (tactical = magin, full = reload)
-        triggerAnim(player, GeoItem.getOrAssignId(stack, (ServerWorld) player.getEntityWorld()),
+        triggerAnim(player, GeoItem.getOrAssignId(stack, (ServerLevel) player.level()),
                 "gun_controller", hasAmmo ? "magin" : "reload");
 
-        world.playSoundFromEntity(
+        world.playSound(
                 null, player,
                 properties.sounds().getReloadSound(hasAmmo),
-                SoundCategory.PLAYERS,
+                SoundSource.PLAYERS,
                 1.0f, 1.0f
         );
         emitGunGameEvent(player, GameEvent.ITEM_INTERACT_FINISH);
 
         setReloading(stack, true);
-        player.getItemCooldownManager().set(stack, properties.getReloadDuration(hasAmmo));
+        player.getCooldowns().addCooldown(stack, properties.getReloadDuration(hasAmmo));
     }
 
-    public void tickReloadCompletion(ServerPlayerEntity player) {
-        ItemStack stack = player.getMainHandStack();
-        if (isReloading(stack) && !player.getItemCooldownManager().isCoolingDown(stack)) {
+    public void tickReloadCompletion(ServerPlayer player) {
+        ItemStack stack = player.getMainHandItem();
+        if (isReloading(stack) && !player.getCooldowns().isOnCooldown(stack)) {
             setAmmo(stack, getMaxAmmo());
             setReloading(stack, false);
         }
@@ -471,30 +471,30 @@ public class GunItem extends Item implements GeoItem {
      * Spawns splash particles/sounds at water entry/exit points.
      * Returns the position where the bullet enters lava (null if it doesn't).
      */
-    private static Vec3d handleFluidInteractions(ServerWorld world, Vec3d start, Vec3d bulletEnd, Vec3d direction) {
+    private static Vec3 handleFluidInteractions(ServerLevel world, Vec3 start, Vec3 bulletEnd, Vec3 direction) {
         double totalDist = start.distanceTo(bulletEnd);
         double stepSize = 0.25;
-        boolean wasInWater = world.getFluidState(BlockPos.ofFloored(start)).isIn(FluidTags.WATER);
+        boolean wasInWater = world.getFluidState(BlockPos.containing(start)).is(FluidTags.WATER);
 
         for (double d = stepSize; d <= totalDist; d += stepSize) {
-            Vec3d pos = start.add(direction.multiply(d));
-            BlockPos blockPos = BlockPos.ofFloored(pos);
+            Vec3 pos = start.add(direction.scale(d));
+            BlockPos blockPos = BlockPos.containing(pos);
             FluidState fluidState = world.getFluidState(blockPos);
 
-            if (fluidState.isIn(FluidTags.LAVA)) {
+            if (fluidState.is(FluidTags.LAVA)) {
                 return pos;
             }
 
-            boolean inWater = fluidState.isIn(FluidTags.WATER);
+            boolean inWater = fluidState.is(FluidTags.WATER);
             if (inWater != wasInWater) {
-                world.spawnParticles(
+                world.sendParticles(
                         ParticleTypes.SPLASH,
                         pos.x, pos.y, pos.z,
                         8, 0.15, 0.05, 0.15, 0.05
                 );
                 world.playSound(null, blockPos,
-                        SoundEvents.ENTITY_GENERIC_SPLASH,
-                        SoundCategory.BLOCKS, 0.6f, 1.4f);
+                        SoundEvents.GENERIC_SPLASH,
+                        SoundSource.BLOCKS, 0.6f, 1.4f);
             }
             wasInWater = inWater;
         }
@@ -508,11 +508,11 @@ public class GunItem extends Item implements GeoItem {
     //   - Glass: full collider → bullet shatters the glass and continues
     //   - Solid blocks: bullet stops
 
-    protected static BlockHitResult raycastFiltered(ServerWorld world, Vec3d start, Vec3d end, Vec3d direction, Entity shooter) {
-        BlockHitResult result = world.raycast(new RaycastContext(
+    protected static BlockHitResult raycastFiltered(ServerLevel world, Vec3 start, Vec3 end, Vec3 direction, Entity shooter) {
+        BlockHitResult result = world.clip(new ClipContext(
                 start, end,
-                RaycastContext.ShapeType.COLLIDER,
-                RaycastContext.FluidHandling.NONE,
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
                 shooter
         ));
 
@@ -522,16 +522,16 @@ public class GunItem extends Item implements GeoItem {
             BlockState state = world.getBlockState(hitBlock);
 
             if (isBulletBreakableGlass(state)) {
-                world.breakBlock(hitBlock, false, shooter);
+                world.destroyBlock(hitBlock, false, shooter);
             } else {
                 return result;
             }
 
-            Vec3d past = result.getPos().add(direction.multiply(0.01));
-            result = world.raycast(new RaycastContext(
+            Vec3 past = result.getLocation().add(direction.scale(0.01));
+            result = world.clip(new ClipContext(
                     past, end,
-                    RaycastContext.ShapeType.COLLIDER,
-                    RaycastContext.FluidHandling.NONE,
+                    ClipContext.Block.COLLIDER,
+                    ClipContext.Fluid.NONE,
                     shooter
             ));
         }
@@ -539,48 +539,48 @@ public class GunItem extends Item implements GeoItem {
         return result;
     }
 
-    private static void handleBlockInteractions(ServerWorld world, BlockHitResult blockHit, ServerPlayerEntity player) {
+    private static void handleBlockInteractions(ServerLevel world, BlockHitResult blockHit, ServerPlayer player) {
         BlockPos pos = blockHit.getBlockPos();
         BlockState state = world.getBlockState(pos);
         Block block = state.getBlock();
 
         // Bells — ring if hit on valid side
         if (block instanceof BellBlock bellBlock) {
-            bellBlock.ring(world, state, blockHit, player, true);
+            bellBlock.onHit(world, state, blockHit, player, true);
         }
 
         // Target blocks — emit redstone signal based on accuracy
         if (block instanceof TargetBlock) {
             int power = calculateTargetPower(blockHit);
-            if (!world.getBlockTickScheduler().isQueued(pos, block)) {
-                world.setBlockState(pos, state.with(Properties.POWER, power), Block.NOTIFY_ALL);
-                world.scheduleBlockTick(pos, block, 8);
+            if (!world.getBlockTicks().hasScheduledTick(pos, block)) {
+                world.setBlock(pos, state.setValue(BlockStateProperties.POWER, power), Block.UPDATE_ALL);
+                world.scheduleTick(pos, block, 8);
             }
         }
 
         // Decorated pots — shatter on hit
         if (block instanceof DecoratedPotBlock) {
-            world.setBlockState(pos, state.with(Properties.CRACKED, true), Block.SKIP_REDRAW_AND_BLOCK_ENTITY_REPLACED_CALLBACK);
-            world.breakBlock(pos, true, player);
+            world.setBlock(pos, state.setValue(BlockStateProperties.CRACKED, true), Block.UPDATE_NONE);
+            world.destroyBlock(pos, true, player);
         }
 
         // Amethyst — chime sound
         if (block instanceof AmethystBlock || block instanceof AmethystClusterBlock) {
-            world.playSound(null, pos, SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.BLOCKS, 1.0f, 0.5f + world.random.nextFloat() * 1.2f);
+            world.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0f, 0.5f + world.random.nextFloat() * 1.2f);
         }
 
         // Wooden buttons — press on hit
-        if (block instanceof ButtonBlock buttonBlock && state.isIn(BlockTags.WOODEN_BUTTONS) && !state.get(Properties.POWERED)) {
-            buttonBlock.powerOn(state, world, pos, null);
+        if (block instanceof ButtonBlock buttonBlock && state.is(BlockTags.WOODEN_BUTTONS) && !state.getValue(BlockStateProperties.POWERED)) {
+            buttonBlock.press(state, world, pos, null);
         }
     }
 
     private static int calculateTargetPower(BlockHitResult hitResult) {
-        Vec3d pos = hitResult.getPos();
-        Direction direction = hitResult.getSide();
-        double d = Math.abs(MathHelper.fractionalPart(pos.x) - 0.5);
-        double e = Math.abs(MathHelper.fractionalPart(pos.y) - 0.5);
-        double f = Math.abs(MathHelper.fractionalPart(pos.z) - 0.5);
+        Vec3 pos = hitResult.getLocation();
+        Direction direction = hitResult.getDirection();
+        double d = Math.abs(Mth.frac(pos.x) - 0.5);
+        double e = Math.abs(Mth.frac(pos.y) - 0.5);
+        double f = Math.abs(Mth.frac(pos.z) - 0.5);
         Direction.Axis axis = direction.getAxis();
         double g;
         if (axis == Direction.Axis.Y) {
@@ -590,16 +590,16 @@ public class GunItem extends Item implements GeoItem {
         } else {
             g = Math.max(e, f);
         }
-        return Math.max(1, MathHelper.ceil(15.0 * MathHelper.clamp((0.5 - g) / 0.5, 0.0, 1.0)));
+        return Math.max(1, Mth.ceil(15.0 * Mth.clamp((0.5 - g) / 0.5, 0.0, 1.0)));
     }
 
     private static boolean isBulletBreakableGlass(BlockState state) {
         // Full glass blocks (clear, stained, tinted) — IMPERMEABLE tag covers these, minus ice
-        if (state.isIn(BlockTags.IMPERMEABLE) && !state.isOf(Blocks.ICE)) {
+        if (state.is(BlockTags.IMPERMEABLE) && !state.is(Blocks.ICE)) {
             return true;
         }
         // Glass panes (but not iron bars or copper panes which also extend PaneBlock)
         return state.getBlock() instanceof StainedGlassPaneBlock
-                || state.isOf(Blocks.GLASS_PANE);
+                || state.is(Blocks.GLASS_PANE);
     }
 }

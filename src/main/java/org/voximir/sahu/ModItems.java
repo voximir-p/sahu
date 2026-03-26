@@ -17,7 +17,7 @@ import static org.voximir.sahu.Sahu.LOGGER;
 public class ModItems {
 
     public static final Item TAURUS_PT_24_7 = register("taurus_pt_24_7", TaurusPT247Item::new, new Item.Settings().maxCount(1));
-    public static final Item NINE_MM = register("9_19mm_parabellum", Item::new, new Item.Settings());
+    public static final Item NINE_MM = register("9mm", Item::new, new Item.Settings());
 
     private static RegistryKey<Item> keyOf(String id) {
         return RegistryKey.of(RegistryKeys.ITEM, Identifier.of(Sahu.MOD_ID, id));
